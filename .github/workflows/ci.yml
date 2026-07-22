@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      # The only two env vars actually read at build/module-load time
+      # (inlined by webpack's DefinePlugin because they're
+      # NEXT_PUBLIC_* — every other secret, e.g. STRIPE_SECRET_KEY,
+      # SUPABASE_SERVICE_ROLE_KEY, QUICKBOOKS_*, XERO_*, RESEND_API_KEY,
+      # is read lazily inside request-time functions via requireEnv()
+      # and is never touched during `next build`). Dummy values are
+      # fine here — this job never talks to a real Supabase project.
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Dead-code check (knip)
+        run: npm run knip
+        continue-on-error: true
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
