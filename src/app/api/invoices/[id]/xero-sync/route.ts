@@ -1,0 +1,140 @@
+// ============================================================
+// POST /api/invoices/:id/xero-sync — pushes a PaperFlow invoice to
+// Xero as an ACCREC Invoice, mirroring
+// /api/invoices/:id/quickbooks-sync. Auto-creates the Xero Contact
+// the first time it's referenced (cached via
+// customers.xero_contact_id). Xero has no per-product Item catalog
+// requirement, so line items carry Description/Quantity/UnitAmount
+// directly against a resolved default sales AccountCode — no
+// products.xero_item_id caching needed on that side.
+//
+// All reads/writes to PaperFlow tables go through the cookie-scoped
+// server client (respects RLS). Only the Xero token lookup itself
+// uses the admin client, since xero_connections has no client-facing
+// RLS policy.
+// ============================================================
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import {
+  getValidAccessToken,
+  findOrCreateXeroContact,
+  getDefaultSalesAccountCode,
+  createXeroInvoice,
+} from '@/lib/xero/server'
+
+export const runtime = 'nodejs'
+
+export async function POST(_req: Request, { params }: { params: { id: string } }) {
+  const supabase = await createClient()
+
+  const { data: invoice, error: invoiceError } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('id', params.id)
+    .single()
+  if (invoiceError || !invoice) {
+    return NextResponse.json({ error: 'Invoice not found.' }, { status: 404 })
+  }
+
+  if (invoice.external_ref) {
+    return NextResponse.json({ error: 'This invoice is already synced to an accounting system.' }, { status: 400 })
+  }
+
+  const tokenInfo = await getValidAccessToken(invoice.organization_id)
+  if (!tokenInfo) {
+    return NextResponse.json(
+      { error: 'Xero is not connected for this organization yet — connect it in Settings.' },
+      { status: 501 }
+    )
+  }
+  const { accessToken, tenantId } = tokenInfo
+
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id, customer_id')
+    .eq('id', invoice.order_id)
+    .single()
+  if (orderError || !order) {
+    return NextResponse.json({ error: 'Order for this invoice not found.' }, { status: 404 })
+  }
+
+  const { data: customer, error: customerError } = await supabase
+    .from('customers')
+    .select('id, name, xero_contact_id')
+    .eq('id', order.customer_id)
+    .single()
+  if (customerError || !customer) {
+    return NextResponse.json({ error: 'Customer for this order not found.' }, { status: 404 })
+  }
+
+  const { data: invoiceLines, error: linesError } = await supabase
+    .from('invoice_lines')
+    .select('*')
+    .eq('invoice_id', invoice.id)
+  if (linesError || !invoiceLines || invoiceLines.length === 0) {
+    return NextResponse.json({ error: 'This invoice has no lines.' }, { status: 400 })
+  }
+
+  const orderLineIds = Array.from(new Set(invoiceLines.map((l) => l.order_line_id)))
+  const { data: orderLines, error: orderLinesError } = await supabase
+    .from('order_lines')
+    .select('id, product_id')
+    .in('id', orderLineIds)
+  if (orderLinesError || !orderLines) {
+    return NextResponse.json({ error: 'Could not load order lines.' }, { status: 500 })
+  }
+
+  const productIds = Array.from(new Set(orderLines.map((l) => l.product_id)))
+  const { data: products, error: productsError } = await supabase
+    .from('products')
+    .select('id, name, sku_code')
+    .in('id', productIds)
+  if (productsError || !products) {
+    return NextResponse.json({ error: 'Could not load products.' }, { status: 500 })
+  }
+
+  try {
+    let xeroContactId = customer.xero_contact_id
+    if (!xeroContactId) {
+      xeroContactId = await findOrCreateXeroContact(tenantId, accessToken, customer.name)
+      await supabase.from('customers').update({ xero_contact_id: xeroContactId }).eq('id', customer.id)
+    }
+
+    const accountCode = await getDefaultSalesAccountCode(tenantId, accessToken)
+
+    const productById = new Map(products.map((p) => [p.id, p]))
+    const orderLineById = new Map(orderLines.map((l) => [l.id, l]))
+
+    const xeroLines = invoiceLines.map((line) => {
+      const orderLine = orderLineById.get(line.order_line_id)
+      const product = orderLine ? productById.get(orderLine.product_id) : undefined
+      if (!product) {
+        throw new Error(`Could not resolve a product for order line ${line.order_line_id}.`)
+      }
+      return {
+        description: `${product.sku_code} — ${product.name}`,
+        qty: line.qty_invoiced,
+        unitPrice: line.unit_price,
+        accountCode,
+      }
+    })
+
+    const xeroInvoiceId = await createXeroInvoice(tenantId, accessToken, xeroContactId, xeroLines)
+
+    const { error: updateError } = await supabase
+      .from('invoices')
+      .update({ external_ref: xeroInvoiceId, status: invoice.status === 'draft' ? 'sent' : invoice.status })
+      .eq('id', invoice.id)
+
+    if (updateError) {
+      return NextResponse.json(
+        { error: `Synced to Xero (Invoice ${xeroInvoiceId}) but failed to save the reference: ${updateError.message}` },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ ok: true, externalRef: xeroInvoiceId })
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 502 })
+  }
+}

@@ -1,0 +1,33 @@
+-- ============================================================
+-- 010_view_security_invoker_fix.sql
+--
+-- Cross-tenant data leak fix for public.price_book_line_margins and
+-- public.cost_inputs_with_total.
+--
+-- Root cause: as of Postgres 15, a plain view's `security_invoker`
+-- option defaults to false. With that default, row-level security
+-- policies on the view's underlying tables are evaluated using the
+-- VIEW OWNER's privileges, not the querying user's — and migrations
+-- are typically applied as a superuser/bypass-RLS role (e.g. the
+-- `postgres` role Supabase runs migrations as). A superuser/BYPASSRLS
+-- owner means RLS is silently skipped entirely for every caller of
+-- the view, regardless of who they are.
+--
+-- Neither view was created with `security_invoker = true`, so every
+-- authenticated user of any organization could read every other
+-- organization's price-book margins and cost inputs through these
+-- two views — the dashboard's margin-alert banner and the Margin
+-- Alerts / Margin Dashboard pages were built on top of exactly this
+-- leak. The underlying tables' own RLS (price_book_lines, price_books,
+-- cost_inputs) was never wrong; the views bypassed it.
+--
+-- Fix: explicitly set `security_invoker = true` on both views so
+-- they evaluate RLS (and column/table privileges) as the querying
+-- user, the same as querying the underlying tables directly would.
+-- This is Postgres's/Supabase's own documented mitigation for this
+-- exact pattern — no application code changes are needed since the
+-- view shapes are unchanged, only the privilege-evaluation context.
+-- ============================================================
+
+alter view public.price_book_line_margins set (security_invoker = true);
+alter view public.cost_inputs_with_total set (security_invoker = true);
