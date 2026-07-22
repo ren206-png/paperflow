@@ -358,6 +358,166 @@ an ongoing regression gate.
    column list (`id, product_id, qty, unit_price`) rather than `select('*')`
    on those two tables specifically, since RLS is row-scoped, not
    column-scoped.
+5. **Verified end-to-end via a live manual walkthrough** (a real Supabase
+   Auth login, two real test customers, direct REST calls against
+   PostgREST outside the app entirely — not mocked):
+   - Built a two-customer fixture (Customer A, Customer B), each with its
+     own price book, a draft + a non-draft quote, two fulfilled orders, and
+     a draft + a non-draft invoice — specifically to exercise every branch
+     of the RLS policies (own-customer visibility, cross-customer
+     invisibility, draft-status hiding for quotes/invoices).
+   - Signed in as a portal login scoped to Customer A and confirmed:
+     `/dashboard/*` redirects to `/portal` (the inverse guard in
+     `dashboard/layout.tsx` fires correctly); the Quotes/Orders/Invoices
+     pages show only Customer A's *non-draft* quote and invoice (the draft
+     versions are correctly hidden) and both of Customer A's orders; no
+     Customer B data is visible anywhere.
+   - **Confirmed the write block is real, not just UI**: authenticated as
+     the portal login and issued direct `PATCH`/`POST`/`DELETE` calls
+     straight against the Supabase REST API (bypassing the app's UI and
+     API routes entirely) — attempting to update Customer A's own visible
+     quote/invoice, insert a new quote, and delete the customer row.
+     Every write was rejected by Postgres RLS (either an explicit `42501
+     row-level security policy` error on insert, or a silently
+     zero-row-affected update/delete), and a service-role re-check
+     confirmed nothing in the database had changed. A direct `SELECT` for
+     Customer B's invoice by id also returned zero rows.
+   - Signing back in as the org admin afterward showed no session
+     disruption; all test data (both customers, the shared SKU, cost
+     input, price books, quotes, orders, invoices, the portal test auth
+     user, and its `user_profiles` row) was deleted afterward.
+   - **Real gap surfaced by this walkthrough**: the actual invite flow
+     (`POST /api/customers/:id/invite` → `supabase.auth.admin
+     .inviteUserByEmail`) hit Supabase Auth's built-in email sender rate
+     limit (`429 over_email_send_rate_limit`), which the route currently
+     surfaced as a generic `502`. No custom SMTP/Resend is wired up for
+     Supabase Auth's own transactional email (separate from the app's
+     `RESEND_API_KEY`, used only for quote delivery and also unset), so
+     there was no fallback once the built-in sender's limit was hit.
+     **Fixed** in the hardening pass below: the route is now rate-limited
+     to 10 invites/hour/org (comfortably under Auth's own limit) and
+     returns a clean `429` instead of a `502` once hit — configuring
+     custom SMTP for Supabase Auth is still worth doing before relying on
+     high-volume invite traffic in production, but the opaque-error part
+     of the gap is closed.
+
+## Hardening / monitoring
+
+A deliberate pass (before any new features) to add the process/
+infrastructure a real audit found actually missing — the codebase itself
+was already clean (no dead code, no stray TODOs, consistent error
+handling, full RLS coverage, hardened `security definer` functions,
+verified webhook signatures, no committed secrets), but nothing ran CI,
+nothing watched for regressions, nothing caught a runtime error in
+production, and nothing rate-limited any endpoint.
+
+- **CI** (`.github/workflows/ci.yml`): every push/PR to `main` runs
+  `type-check` → `lint` → `test` → `build` (blocking — a failure here
+  blocks merge once branch protection is turned on, a manual GitHub
+  settings step not covered by this repo's files) plus `knip` (dead-code/
+  unused-dependency detection) and `npm audit` (non-blocking,
+  `continue-on-error: true` by design — these report, they don't gate,
+  since false positives on a fast-moving app shouldn't block shipping).
+  Only needs two dummy `NEXT_PUBLIC_*` env vars to build; every other
+  secret is read lazily at request time, never at build time, so no real
+  credentials are needed in CI.
+- **Dead-code detection**: `knip.json` (run via `npm run knip`), configured
+  with explicit Next.js App Router entry points (`page`/`layout`/`route`/
+  `error`/etc. per segment) so framework-invoked exports aren't
+  false-flagged as unused. First real run found 9 genuinely unused
+  dependencies (`@hookform/resolvers`, `@stripe/stripe-js`,
+  `@tanstack/react-query-devtools`, `class-variance-authority`,
+  `date-fns`, `lucide-react`, `react-hook-form`, `recharts`, `zod` — zero
+  usages anywhere in `src/`, confirmed by grep before removing), which
+  were removed from `package.json`; the full verification chain
+  (`type-check`/`lint`/`test`/`build`) still passes identically afterward.
+  Remaining findings (4 exported types used only within their own file)
+  are stylistic, not dead code, and left for human judgment.
+- **Rate limiting**: Postgres-backed, no new vendor. A fixed-window
+  counter table (`rate_limit_buckets`, RLS-enabled with zero policies —
+  same default-deny pattern as `quickbooks_connections`/
+  `xero_connections`) plus a `check_rate_limit()` SECURITY DEFINER
+  function (`supabase/migrations/20260721012_rate_limit_buckets.sql`),
+  wrapped by `src/lib/rate-limit/server.ts` (`checkRateLimit(key,
+  maxRequests, windowSeconds)`, fails **open** on error — a rate-limiter
+  outage must never be able to block real traffic). Currently wired into
+  the one endpoint with a proven, documented failure mode from the portal
+  walkthrough above: `POST /api/customers/:id/invite`, 10/hour/org. The
+  helper is generic and cheap to add to more routes (login, quote-send-
+  email) once this pattern is proven in production.
+- **Runtime error monitoring**: Sentry (`@sentry/nextjs`), wired across
+  all three Next.js runtimes it needs (`sentry.client.config.ts`,
+  `sentry.server.config.ts`, `sentry.edge.config.ts` — `src/middleware.ts`
+  runs on Edge by default, hence the separate edge config), plus
+  `src/app/error.tsx` / `src/app/global-error.tsx` App Router error
+  boundaries and explicit `Sentry.captureException` calls at the
+  QuickBooks/Xero invoice-sync routes' catch-all error paths and the
+  Stripe webhook's subscription-sync failure paths. Every config file is
+  guarded on `NEXT_PUBLIC_SENTRY_DSN` being set — leaving it unset (the
+  default) is a true no-op, `Sentry.init()` is simply never called, so
+  the app behaves identically to before Sentry was added until a DSN is
+  actually configured.
+- **RLS regression test**: `supabase/tests/portal_rls.test.sql`, a pgTAP
+  suite (same tooling as the existing `pricing_rpcs.test.sql`) that turns
+  the manual portal walkthrough above into a permanent, repeatable test —
+  own-customer visibility, cross-customer invisibility, draft-status
+  hiding at both the parent-row and line-row level, and the write-block
+  (update/delete silently affect zero rows, insert raises an explicit
+  `42501`) are all asserted directly against Postgres via `set local role
+  authenticated` + `set local request.jwt.claims`, no real network/JWT
+  round trip needed. Not wired into CI yet (needs Docker for `supabase
+  test db`'s local Postgres, which meaningfully slows every push) — run
+  it manually, same as `pricing_rpcs.test.sql`:
+  ```bash
+  supabase init   # first time only — no supabase/config.toml existed before this
+  supabase test db
+  ```
+  **Verified**: run locally end-to-end (`supabase init` → `supabase start`
+  → `supabase test db`) — all 37 assertions across both suites pass. This
+  was the first time this repo's migrations had ever been replayed
+  through the real Supabase CLI/Postgres locally, and it surfaced two
+  real, pre-existing gaps having nothing to do with the portal RLS logic
+  itself, both now fixed:
+  - **Migration filename collision**: 7 migrations shared the
+    `20260704_NNN_*` prefix and 5 shared `20260721_NNN_*`. The Supabase
+    CLI derives each migration's `schema_migrations` version from the
+    digits *before the first underscore* — so every file sharing a date
+    collided on the same version and applying more than one same-day
+    migration in one run failed with a duplicate-key error. Fixed by
+    renaming all 12 existing migrations to fold the sequence number into
+    the leading digit run (e.g. `20260704_001_organizations.sql` →
+    `20260704001_organizations.sql`), which is a pure rename — no SQL
+    content changed, and Postgres/Supabase's own migration application
+    order is unaffected since it still sorts lexically the same way.
+  - **Missing baseline table grants**: every table in the schema granted
+    `anon`/`authenticated` only `TRIGGER`/`TRUNCATE`/`REFERENCES` — never
+    `SELECT`/`INSERT`/`UPDATE`/`DELETE`. RLS policies only decide *which
+    rows* a query may touch; Postgres checks the coarser table-level
+    grant first and rejects the query before RLS is ever evaluated. None
+    of the checked-in migrations ever ran a base-privilege `GRANT`
+    (production almost certainly has this already, most likely applied
+    once via the Supabase Studio Table Editor and never captured back
+    into a migration) — meaning the migration history alone couldn't
+    rebuild a working database from scratch. Fixed in
+    `supabase/migrations/20260722013_baseline_grants.sql`: an explicit,
+    idempotent `grant select, insert, update, delete ... to authenticated`
+    (deliberately **not** `anon` — this app has no unauthenticated
+    data-access path) plus a matching `alter default privileges` so
+    future migrations' tables get the same baseline automatically. RLS
+    remains the real gate: tables with zero policies for a command (e.g.
+    `quickbooks_connections`/`xero_connections`/`rate_limit_buckets` have
+    no policies at all; `audit_log` has only a `SELECT` policy) stay
+    fully denied for that command regardless of this grant.
+- **Dependency updates**: `.github/dependabot.yml` — weekly PRs for both
+  the `npm` and `github-actions` ecosystems, minor/patch grouped.
+- **Health check**: `GET /api/health` — process liveness plus a real
+  Supabase connectivity check, for manual smoke-testing and as a target
+  for external uptime monitoring.
+- **Weekly scheduled audit**: beyond CI-on-every-push, a recurring weekly
+  job runs the same non-blocking checks (`lint`, `type-check`, `test`,
+  `knip`, `npm audit`) independent of whether anyone pushed that week —
+  catches drift like a freshly-disclosed CVE in an otherwise-unchanged
+  dependency.
 
 ## Deferred / not built (by design, see strategy doc)
 
