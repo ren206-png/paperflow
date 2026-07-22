@@ -3,7 +3,7 @@ import { resolvePriceBookId, resolveUnitPrice, getLatestCostInput } from './reso
 
 // These wrappers exist solely to call fixed Postgres RPC names with the
 // right argument shape — the actual resolution logic lives in the DB
-// (see supabase/migrations/20260704_004_price_books.sql and
+// (see supabase/migrations/20260704004_price_books.sql and
 // supabase/tests/pricing_rpcs.test.sql for the tier-matching behavior
 // itself). What we're guarding here is that a rename/typo in the RPC
 // name or argument keys doesn't silently ship.

@@ -2,7 +2,7 @@
 -- 011_audit_trigger_cascade_fix.sql
 --
 -- Fixes a NOT NULL violation in audit_price_book_line_change()
--- (defined in 20260704_005_quotes_orders_invoices.sql) that fires
+-- (defined in 20260704005_quotes_orders_invoices.sql) that fires
 -- when a price_books row is deleted directly.
 --
 -- Root cause: price_book_lines.price_book_id is `on delete cascade`

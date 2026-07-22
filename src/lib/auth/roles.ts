@@ -1,6 +1,6 @@
 // ============================================================
 // Shared "is this role an org admin" check, mirroring the SQL
-// is_org_admin() function (see 20260704_001_organizations.sql)
+// is_org_admin() function (see 20260704001_organizations.sql)
 // and the client-side deriveFlags() in AuthProvider. Needed
 // server-side for routes that write to tables with no RLS policy
 // at all (e.g. quickbooks_connections) and so must authorize the

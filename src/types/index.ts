@@ -121,7 +121,7 @@ export interface PriceBookLine {
   updated_at: string
 }
 
-// Computed (never stored) — see supabase/migrations/20260704_007_margin_guard.sql.
+// Computed (never stored) — see supabase/migrations/20260704007_margin_guard.sql.
 // margin_pct/current_unit_cost/cost_effective_date are null when the SKU has
 // no cost_inputs row yet at all.
 export interface PriceBookLineMargin {

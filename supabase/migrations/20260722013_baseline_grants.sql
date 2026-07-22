@@ -1,0 +1,58 @@
+-- ============================================================
+-- 013_baseline_grants.sql
+--
+-- Fixes a real reproducibility gap discovered while getting the
+-- pgTAP suite (supabase/tests/portal_rls.test.sql) running for the
+-- first time via `supabase test db` against a database built purely
+-- from this repo's own migrations (no supabase/config.toml or local
+-- CLI stack had ever been exercised here before this hardening pass).
+--
+-- Symptom: `select * from public.quotes` as the `authenticated` role
+-- failed with `ERROR: permission denied for table quotes`, even
+-- though the RLS policies (migration 20260721009_customer_portal.sql
+-- etc.) are correct. Root cause, confirmed by querying
+-- information_schema.table_privileges on a fresh local instance:
+-- EVERY table in the public schema grants `anon`/`authenticated` only
+-- TRIGGER/TRUNCATE/REFERENCES — never SELECT/INSERT/UPDATE/DELETE.
+-- None of the checked-in migrations contain a single base-privilege
+-- GRANT statement (only a handful of `grant execute on function ...`
+-- for specific RPCs).
+--
+-- Why this was invisible until now: RLS policies only decide *which
+-- rows* a query may see/touch — Postgres checks the coarser table-
+-- level GRANT first and rejects the query outright if that's
+-- missing, before RLS is ever evaluated. The app's real
+-- staging/production behavior (including the live manual portal RLS
+-- walkthrough documented in README.md) works today, so these grants
+-- must already exist there — almost certainly applied once, ad hoc,
+-- via the Supabase Studio Table Editor (which auto-grants
+-- SELECT/INSERT/UPDATE/DELETE when a table is created or RLS is
+-- toggled through the dashboard UI) and never captured back into a
+-- migration, since every table here was created via raw SQL
+-- migrations instead. That means the migration history alone could
+-- not rebuild a working database from scratch — a real gap for
+-- disaster recovery, spinning up a fresh preview/staging project, or
+-- onboarding a new environment.
+--
+-- Fix: make the implicit grants explicit and idempotent, scoped to
+-- `authenticated` only (not `anon` — this app has no unauthenticated
+-- data-access path; every page that touches these tables requires a
+-- logged-in session, confirmed by grep across src/). RLS remains the
+-- real access-control layer: tables with zero policies for a given
+-- command (e.g. quickbooks_connections/xero_connections/
+-- rate_limit_buckets have zero policies at all; audit_log has only a
+-- SELECT policy, no write policies) stay fully denied for that
+-- command regardless of this grant, by RLS's own default-deny
+-- behavior. Confirmed RLS is enabled (relrowsecurity = true) on every
+-- base table in this schema before writing this migration.
+--
+-- Also sets default privileges so tables added by *future* migrations
+-- (which run as the same role executing this statement) get the same
+-- baseline automatically, instead of silently repeating this gap.
+-- No sequences exist in this schema (all PKs are gen_random_uuid()),
+-- so there's nothing to grant there.
+-- ============================================================
+grant select, insert, update, delete on all tables in schema public to authenticated;
+
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated;
