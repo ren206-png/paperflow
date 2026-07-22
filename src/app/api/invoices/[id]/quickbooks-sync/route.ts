@@ -13,6 +13,7 @@
 // RLS policy.
 // ============================================================
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 import {
   getValidAccessToken,
@@ -146,6 +147,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
     return NextResponse.json({ ok: true, externalRef: qboInvoiceId })
   } catch (err) {
+    Sentry.captureException(err, { tags: { integration: 'quickbooks', invoiceId: invoice.id } })
     return NextResponse.json({ error: (err as Error).message }, { status: 502 })
   }
 }

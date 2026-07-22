@@ -11,6 +11,7 @@
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
+import * as Sentry from '@sentry/nextjs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getStripe, tierForPriceId } from '@/lib/stripe/server'
 
@@ -56,6 +57,7 @@ async function syncSubscription(subscription: Stripe.Subscription) {
   const { error } = await query
   if (error) {
     console.error('Failed to sync subscription to organization:', error.message)
+    Sentry.captureException(new Error(`Stripe webhook: failed to sync subscription: ${error.message}`))
   }
 }
 
@@ -74,6 +76,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const { error } = await query
   if (error) {
     console.error('Failed to mark subscription canceled:', error.message)
+    Sentry.captureException(new Error(`Stripe webhook: failed to mark subscription canceled: ${error.message}`))
   }
 }
 
@@ -94,6 +97,9 @@ export async function POST(req: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET)
   } catch (err) {
+    // Deliberately not captured to Sentry: an invalid signature is the
+    // expected shape of a malformed/hostile request, not an app bug —
+    // capturing every probe here would just be noise.
     return NextResponse.json({ error: `Invalid signature: ${(err as Error).message}` }, { status: 400 })
   }
 
