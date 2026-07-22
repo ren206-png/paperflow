@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isAdminRole } from '@/lib/auth/roles'
+import { checkRateLimit } from '@/lib/rate-limit/server'
 
 export const runtime = 'nodejs'
 
@@ -56,6 +57,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .single()
   if (customerError || !customer) {
     return NextResponse.json({ error: 'Customer not found.' }, { status: 404 })
+  }
+
+  // 10 invites/hour/org — generous for real onboarding, but comfortably
+  // under Supabase Auth's own email-send rate limit (the actual failure
+  // mode this was added for: repeated invites tripped Auth's built-in
+  // limit and surfaced as an opaque 502 below).
+  const withinLimit = await checkRateLimit(`invite:${profile.organization_id}`, 10, 3600)
+  if (!withinLimit) {
+    return NextResponse.json(
+      { error: 'Too many portal invites sent recently. Try again in a while.' },
+      { status: 429 }
+    )
   }
 
   const body = await req.json().catch(() => ({}))
