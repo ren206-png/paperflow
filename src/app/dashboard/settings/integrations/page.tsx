@@ -92,7 +92,7 @@ function IntegrationsSettingsContent() {
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900">Integrations</h1>
       <p className="mt-1 text-sm text-gray-500">
-        Connect accounting tools PaperFlow can push invoices to once an order is fulfilled and invoiced.
+        Connect accounting tools PlyCount can push invoices to once an order is fulfilled and invoiced.
       </p>
 
       <div className="mt-6 rounded-lg border border-gray-200 bg-white p-5">
@@ -106,7 +106,7 @@ function IntegrationsSettingsContent() {
                   ? `Connected (company ${qboStatus.realmId})`
                   : xeroStatus?.connected
                     ? 'Not connected — disconnect Xero first to connect QuickBooks instead.'
-                    : 'Not connected — invoices stay in PaperFlow only until you connect.'}
+                    : 'Not connected — invoices stay in PlyCount only until you connect.'}
             </p>
           </div>
           {qboStatus?.connected ? (
@@ -141,7 +141,7 @@ function IntegrationsSettingsContent() {
                   ? `Connected (tenant ${xeroStatus.tenantId})`
                   : qboStatus?.connected
                     ? 'Not connected — disconnect QuickBooks first to connect Xero instead.'
-                    : 'Not connected — invoices stay in PaperFlow only until you connect.'}
+                    : 'Not connected — invoices stay in PlyCount only until you connect.'}
             </p>
           </div>
           {xeroStatus?.connected ? (

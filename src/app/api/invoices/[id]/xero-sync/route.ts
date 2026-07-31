@@ -1,5 +1,5 @@
 // ============================================================
-// POST /api/invoices/:id/xero-sync — pushes a PaperFlow invoice to
+// POST /api/invoices/:id/xero-sync — pushes a PlyCount invoice to
 // Xero as an ACCREC Invoice, mirroring
 // /api/invoices/:id/quickbooks-sync. Auto-creates the Xero Contact
 // the first time it's referenced (cached via
@@ -8,7 +8,7 @@
 // directly against a resolved default sales AccountCode — no
 // products.xero_item_id caching needed on that side.
 //
-// All reads/writes to PaperFlow tables go through the cookie-scoped
+// All reads/writes to PlyCount tables go through the cookie-scoped
 // server client (respects RLS). Only the Xero token lookup itself
 // uses the admin client, since xero_connections has no client-facing
 // RLS policy.

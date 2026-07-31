@@ -38,7 +38,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const buffer = await renderQuotePdfBuffer(result.data)
   const resend = new Resend(process.env.RESEND_API_KEY)
 
-  const fromAddress = process.env.RESEND_FROM_EMAIL || 'quotes@paperflow.app'
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'quotes@plycount.app'
 
   const { error: sendError } = await resend.emails.send({
     from: `${result.data.organizationName} <${fromAddress}>`,

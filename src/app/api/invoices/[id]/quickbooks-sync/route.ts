@@ -1,12 +1,12 @@
 // ============================================================
-// POST /api/invoices/:id/quickbooks-sync — pushes a PaperFlow
+// POST /api/invoices/:id/quickbooks-sync — pushes a PlyCount
 // invoice to QuickBooks Online as a QBO Invoice, auto-creating the
 // QBO Customer/Item records the first time each is referenced
 // (cached afterwards via customers.quickbooks_customer_id /
 // products.quickbooks_item_id). Sets invoices.external_ref to the
 // resulting QBO Invoice Id on success.
 //
-// All reads/writes to PaperFlow tables go through the cookie-scoped
+// All reads/writes to PlyCount tables go through the cookie-scoped
 // server client (respects RLS — a user can only sync invoices in
 // their own org). Only the QuickBooks token lookup itself uses the
 // admin client, since quickbooks_connections has no client-facing

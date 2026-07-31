@@ -1,7 +1,7 @@
 // ============================================================
 // Stripe server client — platform subscription billing only
 // (Starter/Growth tiers). This is separate from customer AR;
-// invoices to PaperFlow's own customers stay in `invoices` /
+// invoices to PlyCount's own customers stay in `invoices` /
 // QuickBooks sync (see src/lib/quickbooks), not Stripe.
 // SERVER-ONLY: never import from a Client Component.
 // ============================================================

@@ -8,8 +8,8 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'sw
 
 export const metadata = {
   title: {
-    default: 'PaperFlow — Contract Pricing & Margin Engine for Paper Converters',
-    template: '%s | PaperFlow',
+    default: 'PlyCount — Contract Pricing & Margin Engine for Paper Converters',
+    template: '%s | PlyCount',
   },
   description:
     'Contract and volume pricing, live margin visibility, and quote-to-invoice workflow built for tissue and paper converters.',

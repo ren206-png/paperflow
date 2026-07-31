@@ -1,7 +1,7 @@
-# PaperFlow OS
+# PlyCount
 
 Contract pricing & margin engine for paper converters/distributors. This is the
-MVP wedge product from the PaperFlow OS strategy engagement: a quote builder
+MVP wedge product from the PlyCount strategy engagement: a quote builder
 that resolves the correct contract/volume price per customer+SKU+quantity and
 shows live per-line and blended margin against snapshotted unit cost — so a
 sales rep can never accidentally quote below floor margin without seeing it.

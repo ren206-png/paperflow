@@ -40,7 +40,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen">
       <aside className="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
         <div className="border-b border-gray-200 px-5 py-4">
-          <p className="text-lg font-bold text-brand-700">PaperFlow</p>
+          <p className="text-lg font-bold text-brand-700">PlyCount</p>
           <p className="truncate text-xs text-gray-500">
             {isLoading ? 'Loading…' : organization?.name ?? 'No organization'}
           </p>

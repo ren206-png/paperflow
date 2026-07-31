@@ -31,7 +31,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     <div className="flex min-h-screen">
       <aside className="flex w-56 shrink-0 flex-col border-r border-gray-200 bg-white">
         <div className="border-b border-gray-200 px-5 py-4">
-          <p className="text-lg font-bold text-brand-700">{organization?.name ?? 'PaperFlow'}</p>
+          <p className="text-lg font-bold text-brand-700">{organization?.name ?? 'PlyCount'}</p>
           <p className="text-xs text-gray-500">Customer portal</p>
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">

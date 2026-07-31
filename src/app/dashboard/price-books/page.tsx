@@ -39,7 +39,7 @@ export default function PriceBooksPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Price Books</h1>
           <p className="text-sm text-gray-500">
-            Contract and volume pricing with effective dates — the core of PaperFlow.
+            Contract and volume pricing with effective dates — the core of PlyCount.
           </p>
         </div>
         <Link href="/dashboard/price-books/new">

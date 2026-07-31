@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
 const TIER_COPY: Record<string, { label: string; blurb: string }> = {
-  free_trial: { label: 'Free Trial', blurb: 'Full access while you evaluate PaperFlow.' },
+  free_trial: { label: 'Free Trial', blurb: 'Full access while you evaluate PlyCount.' },
   starter: { label: 'Starter', blurb: 'For a single location getting started with contract pricing.' },
   growth: { label: 'Growth', blurb: 'For multi-rep teams that need price books and margin visibility at scale.' },
 }
@@ -87,7 +87,7 @@ function BillingSettingsContent() {
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
       <p className="mt-1 text-sm text-gray-500">
-        Manage your PaperFlow subscription. This is separate from your customers&apos; invoices, which stay in
+        Manage your PlyCount subscription. This is separate from your customers&apos; invoices, which stay in
         Orders / QuickBooks.
       </p>
 

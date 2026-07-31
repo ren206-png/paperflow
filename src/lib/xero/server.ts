@@ -250,7 +250,7 @@ export interface XeroInvoiceLineInput {
  * DueDate is required by Xero whenever Status is AUTHORISED (confirmed
  * live: omitting it fails with "The document DueDate field must be
  * specified"), unlike QuickBooks which defaults due date server-side
- * when none is sent. PaperFlow has no payment-terms concept yet, so
+ * when none is sent. PlyCount has no payment-terms concept yet, so
  * this defaults to net-30 from today.
  */
 export async function createXeroInvoice(

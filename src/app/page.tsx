@@ -4,7 +4,7 @@ export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-6 px-6 text-center">
       <h1 className="text-3xl font-bold tracking-tight text-brand-700 sm:text-4xl">
-        PaperFlow
+        PlyCount
       </h1>
       <p className="max-w-xl text-lg text-gray-600">
         Contract pricing, volume tiers, and live margin visibility for tissue and
