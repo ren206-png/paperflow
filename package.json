@@ -35,7 +35,7 @@
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.3",
-    "knip": "^5.38.0",
+    "knip": "^6.29.0",
     "postcss": "^8.4.38",
     "tailwindcss": "3.4.19",
     "typescript": "5.9.3",
