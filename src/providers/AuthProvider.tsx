@@ -10,7 +10,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
   useCallback,
   type ReactNode,
@@ -47,7 +46,7 @@ function deriveFlags(profile: UserProfile | null) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const supabase = useRef(createClient()).current
+  const [supabase] = useState(() => createClient())
 
   const [state, setState] = useState<AuthState>({
     user: null,

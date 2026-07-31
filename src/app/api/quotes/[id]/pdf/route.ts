@@ -11,9 +11,10 @@ import { renderQuotePdfBuffer } from '@/lib/pdf/renderQuotePdf'
 
 export const runtime = 'nodejs'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = await createClient()
-  const result = await getQuotePdfData(supabase, params.id)
+  const result = await getQuotePdfData(supabase, id)
 
   if ('error' in result) {
     return NextResponse.json({ error: result.error }, { status: 404 })

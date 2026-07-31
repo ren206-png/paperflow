@@ -25,7 +25,8 @@ import { checkRateLimit } from '@/lib/rate-limit/server'
 
 export const runtime = 'nodejs'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { data: customer, error: customerError } = await supabase
     .from('customers')
     .select('id, name')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
   if (customerError || !customer) {
     return NextResponse.json({ error: 'Customer not found.' }, { status: 404 })
@@ -119,7 +120,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ ok: true })
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -149,7 +151,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const { data: portalUser, error: portalUserError } = await admin
     .from('user_profiles')
     .select('id, auth_user_id, organization_id')
-    .eq('customer_id', params.id)
+    .eq('customer_id', id)
     .eq('role', 'client_viewer')
     .maybeSingle()
   if (portalUserError || !portalUser) {

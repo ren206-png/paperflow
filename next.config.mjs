@@ -3,9 +3,6 @@ import { withSentryConfig } from '@sentry/nextjs'
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
 }
 
 // Sentry's build-time wrapper (source map upload, etc.) only does

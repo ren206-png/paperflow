@@ -83,8 +83,13 @@ export default function CostInputsPage() {
     onError: (err: Error) => toast.error(err.message),
   })
 
+  // Captured once per mount rather than read fresh on every render — the
+  // staleness check doesn't need to tick in real time, and reading
+  // Date.now() directly during render is impure (flagged by the
+  // react-hooks/purity rule).
+  const now = useState(() => Date.now())[0]
   const isStale = (dateStr: string) => {
-    const days = (Date.now() - new Date(dateStr).getTime()) / 86_400_000
+    const days = (now - new Date(dateStr).getTime()) / 86_400_000
     return days > STALE_AFTER_DAYS
   }
 
