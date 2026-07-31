@@ -38,7 +38,7 @@
     "knip": "^6.29.0",
     "postcss": "^8.5.25",
     "tailwindcss": "^4.3.3",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "vitest": "^4.1.10"
   },
   "overrides": {
