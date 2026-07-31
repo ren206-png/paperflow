@@ -13,7 +13,8 @@ import { renderQuotePdfBuffer } from '@/lib/pdf/renderQuotePdf'
 
 export const runtime = 'nodejs'
 
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   if (!process.env.RESEND_API_KEY) {
     return NextResponse.json(
       { error: 'Email delivery is not configured yet (RESEND_API_KEY missing). Download the PDF and send it manually for now.' },
@@ -22,7 +23,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   }
 
   const supabase = await createClient()
-  const result = await getQuotePdfData(supabase, params.id)
+  const result = await getQuotePdfData(supabase, id)
 
   if ('error' in result) {
     return NextResponse.json({ error: result.error }, { status: 404 })
@@ -60,7 +61,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const { error: statusError } = await supabase
     .from('quotes')
     .update({ status: 'sent' })
-    .eq('id', params.id)
+    .eq('id', id)
 
   if (statusError) {
     return NextResponse.json(
