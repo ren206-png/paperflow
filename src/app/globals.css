@@ -1,6 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* Preserves the `darkMode: 'class'` behavior from the old tailwind.config.ts
+   (class-based dark: variant instead of v4's default prefers-color-scheme). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand-50: #f4f7f5;
+  --color-brand-100: #e3ebe6;
+  --color-brand-500: #2f6b4f;
+  --color-brand-600: #25553f;
+  --color-brand-700: #1c4130;
+}
 
 :root {
   --font-inter: 'Inter', system-ui, sans-serif;

@@ -4,5 +4,6 @@
     "src/app/**/{page,layout,route,loading,error,global-error,not-found,template,default}.{ts,tsx}"
   ],
   "project": ["src/**/*.{ts,tsx}"],
-  "ignoreExportsUsedInFile": true
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": ["tailwindcss"]
 }
